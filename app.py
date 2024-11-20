@@ -5,11 +5,13 @@ import bcrypt
 import os
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
 from dotenv import load_dotenv
+from flasgger import Swagger
 
 # Load environment variables from .env file
 load_dotenv()
 
 app = Flask(__name__)
+swagger = Swagger(app)
 
 # Configuration
 app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY')
@@ -20,7 +22,7 @@ jwt = JWTManager(app)
 
 # Database initialization
 def init_db():
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect("database.db")
     c = conn.cursor()
     c.execute('''
         CREATE TABLE IF NOT EXISTS users (
@@ -42,6 +44,13 @@ def get_db():
 
 @app.route('/')
 def home():
+    """
+    API Gateway Home
+    ---
+    responses:
+      200:
+        description: Lists all available endpoints in the API Gateway.
+    """
     return jsonify({
         "service": "API Gateway",
         "available_endpoints": [
@@ -52,8 +61,7 @@ def home():
                 "body": {
                     "username": "string",
                     "password": "string"
-                },
-                "TEST": "1234"
+                }
             },
             {
                 "path": "/login",
@@ -75,6 +83,28 @@ def home():
 
 @app.route('/register', methods=['POST'])
 def register():
+    """
+    Register a new user
+    ---
+    parameters:
+      - in: body
+        name: user
+        required: true
+        schema:
+          type: object
+          properties:
+            username:
+              type: string
+            password:
+              type: string
+    responses:
+      201:
+        description: User created successfully.
+      400:
+        description: Missing username or password.
+      409:
+        description: Username already exists.
+    """
     data = request.get_json()
     
     if not data or 'username' not in data or 'password' not in data:
@@ -100,6 +130,28 @@ def register():
 
 @app.route('/login', methods=['POST'])
 def login():
+    """
+    Login to get JWT token
+    ---
+    parameters:
+      - in: body
+        name: user
+        required: true
+        schema:
+          type: object
+          properties:
+            username:
+              type: string
+            password:
+              type: string
+    responses:
+      200:
+        description: Login successful. Returns access token.
+      400:
+        description: Missing username or password.
+      401:
+        description: Invalid username or password.
+    """
     data = request.get_json()
     
     if not data or 'username' not in data or 'password' not in data:
@@ -125,6 +177,19 @@ def login():
 @app.route('/api/github/stats', methods=['GET'])
 @jwt_required()
 def get_github_stats():
+    """
+    Get GitHub repository statistics
+    ---
+    security:
+      - JWTAuth: []
+    responses:
+      200:
+        description: Successfully fetched GitHub statistics.
+      401:
+        description: Missing or invalid JWT token.
+      500:
+        description: Server error while fetching data from GitHub microservice.
+    """
     try:
         current_user = get_jwt_identity()
         # Get the JWT token from the request header
